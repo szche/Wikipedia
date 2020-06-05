@@ -1,7 +1,9 @@
 import requests
 import json
 
-url = "https://en.wikipedia.org/w/api.php?"
+#https://en.wikipedia.org/w/api.php?action=query&cmlimit=max&list=categorymembers&cmnamespace=0&format=json&cmtitle=Category:Physics
+
+url = "https://pl.wikipedia.org/w/api.php?"
 pages = []
 queue = []
 flagged = []
@@ -56,15 +58,18 @@ if len(pages)%2 == 1:
 
 
 while len(pages) != 1:
+    print("-"*50)
     print("Pages: {}".format(pages))
     page1 = pages[0]
     page2 = pages[1]
+    print("Looking for connection between {} and {}".format(page1, page2))
+    print("-"*50)
     middleItem = None
     reccomended = None
     #Collect categories to propose an object later
     categories = []
     categories.extend(getCategories(page1))
-    #categories.extend(getCategories(page2))
+    categories.extend(getCategories(page2))
     queue.extend(getLinks([page1]))
     for subPage in queue:
         currentPage = subPage[-1]
@@ -117,11 +122,14 @@ while len(pages) != 1:
     if reccomended == None:
         print("Could not recommend a page :(")
         reccomended = middleItem
-        pages.append(middleItem)
+        pages.append(reccomended)
     else:
         print("I reccomend {}!".format(reccomended))
         pages.append(reccomended)
     msgs.append("Recomendation for that is {}".format(reccomended))
+    print(pages)
+    flagged.clear()
+    queue.clear()
         
     
 print("-"*50)
