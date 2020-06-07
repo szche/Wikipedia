@@ -1,144 +1,128 @@
 import requests
 import json
-
-#https://en.wikipedia.org/w/api.php?action=query&cmlimit=max&list=categorymembers&cmnamespace=0&format=json&cmtitle=Category:Physics
+import random
 
 url = "https://pl.wikipedia.org/w/api.php?"
 pages = []
-queue = []
-flagged = []
-msgs = []
+alerts = []
 
-#Find all the external wiki links inside the specified wiki article
-def getLinks(pageName):
-    links = []
-    print("Page: {}".format(pageName[-1]))
-    response = requests.get(url+"action=parse&prop=links&format=json&page={}".format(pageName[-1]))
-    #If the page doesn't exist return empty array
-    try:
-        data = response.json()["parse"]["links"]
-    except:
-        return []
-    for item in data:
-        if item["ns"] != 0: continue
-        if item['*'] not in links: 
-            temp = [item for item in pageName]
-            temp.append(item['*'])
-            links.append(temp)
-    return links
-
-def getCategories(pageName):
-    categories = []
-    #Get all categories from the pages
-    print("Page: {}".format(pageName))
-    response = requests.get(url+"action=parse&prop=categories&format=json&page={}".format(pageName))
-    #If the page doesn't exist return empty array
-    try:
-        data = response.json()["parse"]["categories"][::-1]
-    except:
+class Page:
+    path = []
+    def __init__(self, name, path = []):
+        self.name = name
+        self.path = path
+        
+    #Get all links within this page, return a Page list
+    def getLinksFrom(self):
+        links = []
+        #print("Checking for links in {}".format(self.name))
+        response = requests.get(url+"action=parse&prop=links&format=json&page={}".format(self.name))
+        #If the page is invalid, return "-1" indicating error
+        try: data = response.json()["parse"]["links"]
+        except: return links
+        #Loop the gathered items and throw away all the Helpers etc.
+        for item in data:
+            if item["ns"] != 0 or item['*'] in links: continue
+            subPage = Page(item["*"], self.path + [self.name])
+            links.append(subPage)
+        random.shuffle(links)
+        return links
+        
+    #Get all categories within this page
+    def getCategoriesFrom(self):
+        categories = []
+        #print("Checking for categories in {}".format(self.name))
+        response = requests.get(url+"action=parse&prop=categories&format=json&page={}".format(self.name))
+        try: data = response.json()["parse"]["categories"][::-1]
+        except: return categories
+        for item in data:
+            if "hidden" in item.keys() or item["*"] in categories: continue
+            categories.append(item["*"])
         return categories
-    for item in data:
-        if "hidden" in item.keys(): continue
-        categories.append(item["*"])
-    return categories
-    
         
+    #Print information about this Page
+    def printDataAbout(self):
+        print("="*30)
+        print("Page name: {}".format(self.name))
+        print("Page path: {} -> {}".format(" -> ".join(self.path), self.name))
+        print("="*30)
 
-def getCurrentLinks(linkHistory):
-    links = [item[-1].lower() for item in linkHistory]
-    return links
-
+#Gather user's input
 while True:
-    inputPage = input("Input the name of the page: ")
-    if inputPage == "": break
-    pages.append(inputPage)    
-#Make the number of pages even by adding the first page to the end
-if len(pages)%2 == 1:
-    pages.append(pages[0])
+   print("=" * 20)
+   inputName = input("Input the name of your page: ")
+   if inputName == "": break
+   inputPage = Page(inputName)
+   if inputPage.getLinksFrom() == [] or inputPage.getCategoriesFrom() == []:
+        print("There's something wrong with the link, try again!")
+        continue
+   pages.append(inputPage)
+   
+if len(pages) < 2:
+    print("Not enough items to determine connections :(")
+    exit()
 
+if len(pages)%2 == 1: pages.append(pages[0])
 
+#Main algorythm loop
 while len(pages) != 1:
-    print("-"*50)
-    print("Pages: {}".format(pages))
-    page1 = pages[0]
-    page2 = pages[1]
-    print("Looking for connection between {} and {}".format(page1, page2))
-    print("-"*50)
-    middleItem = None
-    reccomended = None
-    #Collect categories to propose an object later
+    print("=" * 20)
+    print("====== PAGES ======")
+    for page in pages:
+        print(page.name)
+    print("=" * 20)
+    pageX = pages[0]
+    pageY = pages[1]
+    print("Looking for the closest path between {} and {}".format(pageX.name, pageY.name))
+    connection = None
+    recommendation = None
+    queue = []
+    flagged = []
     categories = []
-    categories.extend(getCategories(page1))
-    categories.extend(getCategories(page2))
-    queue.extend(getLinks([page1]))
+    categories.extend(pageX.getCategoriesFrom())
+    categories.extend(pageY.getCategoriesFrom())
+    queue.extend(pageX.getLinksFrom())
+    #Use BFS to find the closest path between two pages
     for subPage in queue:
-        currentPage = subPage[-1]
-        #We don't want to visit the same page more than once for one pair
-        if currentPage in flagged:
-            queue.remove(subPage)
-            continue
-        
-        subPageLinks = getLinks(subPage)
-        if page2.lower() in getCurrentLinks(subPageLinks):
-            print("-"*20)
-            alert = "{} found in:  {} -> {}".format(pages[1], " -> ".join(subPage), pages[1])
-            print(alert)
-            subPage.append(pages[1])
-            middleItem = subPage[len(subPage)//2]
-            msgs.append(alert)
-            print("https://en.wikipedia.org/wiki/{}".format(subPage[-2]))
-            pages.remove(page1)
-            pages.remove(page2)
-            print("-"*20)
+        if subPage in flagged: continue
+        if pageY.name == subPage.name:
+            print("=" * 20)
+            print("Connection found using {}".format(subPage.name))
+            alerts.append("Connection between {} and {} is {}".format(pageX.name, pageY.name. subPage.name))
+            subPage.printDataAbout()
+            connection = subPage
             break
-        flagged.append(currentPage)
+        queue.extend(subPage.getLinksFrom())
+        flagged.append(subPage)
         queue.remove(subPage)
-        queue.extend(subPageLinks)
-    #Once we found a match for the pair, clear the queue and flagged pages
-    flagged.clear()
-    queue.clear()
-    #Now that we've found the relatable item, let's suggest a new one using the categories
-    #We have our page and want to find the page within it that contains the category
-    flagged.append(page1)
-    flagged.append(page2)
-    queue.extend(getLinks([middleItem]))
+    #Now that we've found the connection, let's clear the queue and try reccomend something
+    print("=" * 20)
+    print("Looking for reccomendation")
+    print("=" * 20)
+    queue = connection.getLinksFrom()
+    flagged = []
+    flagged.append(pageX)
+    flagged.append(pageY)
     for subPage in queue:
-        currentPage = subPage[-1]
-        #We don't want to visit the same page more than once for one pair
-        if currentPage in flagged:
-            queue.remove(subPage)
-            continue
-        
-        subPageCategories = getCategories(currentPage)
-        if set(categories).isdisjoint(set(subPageCategories)) == False:
-            print("-"*20)
-            alert = "{} found in:  {}".format(categories, currentPage)
-            reccomended = currentPage
-            print(alert)
-            print("-"*20)
+        if subPage in flagged: continue
+        if set(categories).isdisjoint(set(subPage.getCategoriesFrom())) == False:
+            print("=" * 20)
+            print("Found recommendation using: {}".format(subPage.name))
+            alerts.append("Reccomendation for that id {}".format(subPage.name))
+            print("=" * 20)
+            recommendation = subPage
             break
-    #If found a reccomended page, use it to determine the next pages in queue
-    #Otherwise use the middleItem
-    if reccomended == None:
-        print("Could not recommend a page :(")
-        reccomended = middleItem
-        pages.append(reccomended)
-    else:
-        print("I reccomend {}!".format(reccomended))
-        pages.append(reccomended)
-    msgs.append("Recomendation for that is {}".format(reccomended))
-    print(pages)
-    flagged.clear()
-    queue.clear()
-        
+        flagged.append(subPage)
+        queue.remove(subPage)
+        queue.extend(subPage.getLinksFrom())
+
+    pages.remove(pageX)
+    pages.remove(pageY)
+    pages.append(recommendation)
     
-print("-"*50)
-print("\t\tRESULTS")
-print("-"*50)
-for message in msgs:
-    print(message)
-
-print("-" * 20)
-print("The best match is: {}".format(pages[0]))
-print("https://en.wikipedia.org/wiki/{}".format(pages[0]))
-
+    
+print("=" * 20)
+print("===== RESULTS =====")
+for alert in alerts:
+    print(alert)
+print("=" * 20)
