@@ -1,6 +1,5 @@
 import requests
 import json
-import random
 
 url = "https://pl.wikipedia.org/w/api.php?"
 pages = []
@@ -25,7 +24,6 @@ class Page:
             if item["ns"] != 0 or item['*'] in links: continue
             subPage = Page(item["*"], self.path + [self.name])
             links.append(subPage)
-        random.shuffle(links)
         return links
         
     #Get all categories within this page
@@ -64,6 +62,7 @@ if len(pages) < 2:
 
 if len(pages)%2 == 1: pages.append(pages[0])
 
+
 #Main algorythm loop
 while len(pages) != 1:
     print("=" * 20)
@@ -73,7 +72,7 @@ while len(pages) != 1:
     print("=" * 20)
     pageX = pages[0]
     pageY = pages[1]
-    print("Looking for the closest path between {} and {}".format(pageX.name, pageY.name))
+    print("\tLooking for the path between {} -> {}".format(pageX.name, pageY.name))
     connection = None
     recommendation = None
     queue = []
@@ -82,34 +81,34 @@ while len(pages) != 1:
     categories.extend(pageX.getCategoriesFrom())
     categories.extend(pageY.getCategoriesFrom())
     queue.extend(pageX.getLinksFrom())
+    flagged.append(pageX)
     #Use BFS to find the closest path between two pages
     for subPage in queue:
-        if subPage in flagged: continue
-        if pageY.name == subPage.name:
+        if subPage in [link.name for link in flagged]: continue
+        print("{} -> {}".format(" -> ".join(subPage.path), subPage.name))
+        subPageLinks = subPage.getLinksFrom()
+        if pageY.name in [link.name for link in subPageLinks]:
             print("=" * 20)
-            print("Connection found using {}".format(subPage.name))
-            alerts.append("Connection between {} and {} is {}".format(pageX.name, pageY.name. subPage.name))
+            print("\tConnection found using {}".format(subPage.name))
+            alerts.append("Connection between {} and {} is {}".format(pageX.name, pageY.name, subPage.name))
             subPage.printDataAbout()
             connection = subPage
             break
-        queue.extend(subPage.getLinksFrom())
+        queue.extend(subPageLinks)
         flagged.append(subPage)
         queue.remove(subPage)
     #Now that we've found the connection, let's clear the queue and try reccomend something
-    print("=" * 20)
-    print("Looking for reccomendation")
-    print("=" * 20)
+    print("\tLooking for reccomendation")
     queue = connection.getLinksFrom()
     flagged = []
     flagged.append(pageX)
     flagged.append(pageY)
     for subPage in queue:
-        if subPage in flagged: continue
+        if subPage.name in [link.name for link in flagged]: continue
+        print("Subpage: {}".format(subPage.name))
         if set(categories).isdisjoint(set(subPage.getCategoriesFrom())) == False:
-            print("=" * 20)
-            print("Found recommendation using: {}".format(subPage.name))
-            alerts.append("Reccomendation for that id {}".format(subPage.name))
-            print("=" * 20)
+            print("\tFound recommendation using: {}".format(subPage.name))
+            alerts.append("Reccomendation for that is {}".format(subPage.name))
             recommendation = subPage
             break
         flagged.append(subPage)
