@@ -1,5 +1,8 @@
 import requests
 import json
+import copy 
+import collections
+import random
 
 url = "https://pl.wikipedia.org/w/api.php?"
 pages = []
@@ -45,6 +48,7 @@ class Page:
         print("Page path: {} -> {}".format(" -> ".join(self.path), self.name))
         print("="*30)
 
+
 #Gather user's input
 while True:
    print("=" * 20)
@@ -62,6 +66,7 @@ if len(pages) < 2:
 
 if len(pages)%2 == 1: pages.append(pages[0])
 
+initPages = copy.deepcopy(pages)
 
 #Main algorythm loop
 while len(pages) != 1:
@@ -78,46 +83,57 @@ while len(pages) != 1:
     queue = []
     flagged = []
     categories = []
-    categories.extend(pageX.getCategoriesFrom())
-    categories.extend(pageY.getCategoriesFrom())
+    #categories.extend(pageX.getCategoriesFrom())
+    #categories.extend(pageY.getCategoriesFrom())   
+    categories = [item for item, count in collections.Counter(pageY.getCategoriesFrom() + pageX.getCategoriesFrom()).items() if count > 1]
+    if len(categories) == 0:
+        categories.extend(pageX.getCategoriesFrom())
+    
     queue.extend(pageX.getLinksFrom())
-    flagged.append(pageX)
+    #flagged.append(pageX)
+    lastLinksFrom = pageX
     #Use BFS to find the closest path between two pages
     for subPage in queue:
-        if subPage in [link.name for link in flagged]: continue
-        print("{} -> {}".format(" -> ".join(subPage.path), subPage.name))
+        if subPage.name in [link.name for link in flagged] or subPage.name in [link.name for link in pages]: continue
         subPageLinks = subPage.getLinksFrom()
-        if pageY.name in [link.name for link in subPageLinks]:
+        if pageY.name in [link.name for link in queue]:
             print("=" * 20)
-            print("\tConnection found using {}".format(subPage.name))
-            alerts.append("Connection between {} and {} is {}".format(pageX.name, pageY.name, subPage.name))
-            subPage.printDataAbout()
-            connection = subPage
+            print("\tConnection found using {}".format(lastLinksFrom.name))
+            alerts.append("Connection between {} and {} is {}".format(pageX.name, pageY.name, lastLinksFrom.name))
+            connection = lastLinksFrom
             break
-        queue.extend(subPageLinks)
-        flagged.append(subPage)
+        print("{} -> {}".format(" -> ".join(subPage.path), subPage.name))
+        flagged.append(lastLinksFrom)
+        lastLinksFrom = subPage
         queue.remove(subPage)
+        queue.extend(subPageLinks)
+
     #Now that we've found the connection, let's clear the queue and try reccomend something
     print("\tLooking for reccomendation")
+    print(categories)
     queue = connection.getLinksFrom()
+    random.shuffle(queue)
     flagged = []
     flagged.append(pageX)
     flagged.append(pageY)
+    recommendation = [connection, []]
     for subPage in queue:
-        if subPage.name in [link.name for link in flagged]: continue
-        print("Subpage: {}".format(subPage.name))
-        if set(categories).isdisjoint(set(subPage.getCategoriesFrom())) == False:
-            print("\tFound recommendation using: {}".format(subPage.name))
-            alerts.append("Reccomendation for that is {}".format(subPage.name))
-            recommendation = subPage
+        if subPage.name in [link.name for link in flagged] or subPage.name in [link.name for link in pages]: continue
+        sameCats = [item for item, count in collections.Counter(categories+subPage.getCategoriesFrom()).items() if count > 1]
+        # encounters.append([subPage.name, len(sameCats)])
+        if len(sameCats) > len(recommendation[1]):
+            recommendation = [subPage, sameCats]
+        if len(recommendation[1]) == len(categories):
             break
+        print("Subpage: {}\t\t{} categories".format(subPage.name, len(sameCats)))
         flagged.append(subPage)
         queue.remove(subPage)
-        queue.extend(subPage.getLinksFrom())
-
+    print("The best recommendation is {} with {}".format(recommendation[0].name, len(recommendation[1])))
+    alerts.append("The best recommendation is {} with {} of the same categories".format(recommendation[0].name, len(recommendation[1])))
+    
     pages.remove(pageX)
     pages.remove(pageY)
-    pages.append(recommendation)
+    pages.append(recommendation[0])
     
     
 print("=" * 20)
