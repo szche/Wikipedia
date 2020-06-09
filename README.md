@@ -5,5 +5,5 @@ Instead of downloading entire wikipedia's database, it uses API calls to search 
 
 ## Requirements
 ```python
-pip install json, requests
+pip install json, requests, copy, collections, random, math
 ```

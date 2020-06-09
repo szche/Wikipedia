@@ -3,6 +3,7 @@ import json
 import copy 
 import collections
 import random
+import math
 
 url = "https://pl.wikipedia.org/w/api.php?"
 pages = []
@@ -13,11 +14,9 @@ class Page:
     def __init__(self, name, path = []):
         self.name = name
         self.path = path
-        
     #Get all links within this page, return a Page list
     def getLinksFrom(self):
         links = []
-        #print("Checking for links in {}".format(self.name))
         response = requests.get(url+"action=parse&prop=links&format=json&page={}".format(self.name))
         #If the page is invalid, return "-1" indicating error
         try: data = response.json()["parse"]["links"]
@@ -28,11 +27,9 @@ class Page:
             subPage = Page(item["*"], self.path + [self.name])
             links.append(subPage)
         return links
-        
     #Get all categories within this page
     def getCategoriesFrom(self):
         categories = []
-        #print("Checking for categories in {}".format(self.name))
         response = requests.get(url+"action=parse&prop=categories&format=json&page={}".format(self.name))
         try: data = response.json()["parse"]["categories"][::-1]
         except: return categories
@@ -40,7 +37,6 @@ class Page:
             if "hidden" in item.keys() or item["*"] in categories: continue
             categories.append(item["*"])
         return categories
-        
     #Print information about this Page
     def printDataAbout(self):
         print("="*30)
@@ -49,10 +45,9 @@ class Page:
         print("="*30)
 
 
-#Gather user's input
+# ==== Gather user's input ====
 while True:
-   print("=" * 20)
-   inputName = input("Input the name of your page: ")
+   inputName = input("\tInput the name of your page: ")
    if inputName == "": break
    inputPage = Page(inputName)
    if inputPage.getLinksFrom() == [] or inputPage.getCategoriesFrom() == []:
@@ -68,13 +63,11 @@ if len(pages)%2 == 1: pages.append(pages[0])
 
 initPages = copy.deepcopy(pages)
 
-#Main algorythm loop
+# ==== Main algorythm loop ====
 while len(pages) != 1:
-    print("=" * 20)
-    print("====== PAGES ======")
-    for page in pages:
-        print(page.name)
-    print("=" * 20)
+    print("====== REMAINING PAGES ======")
+    print(", ".join(page.name for page in pages))
+    print("=" * 30)
     pageX = pages[0]
     pageY = pages[1]
     print("\tLooking for the path between {} -> {}".format(pageX.name, pageY.name))
@@ -83,16 +76,13 @@ while len(pages) != 1:
     queue = []
     flagged = []
     categories = []
-    #categories.extend(pageX.getCategoriesFrom())
-    #categories.extend(pageY.getCategoriesFrom())   
+    #Collect categories to find a recommendation later
     categories = [item for item, count in collections.Counter(pageY.getCategoriesFrom() + pageX.getCategoriesFrom()).items() if count > 1]
-    if len(categories) == 0:
-        categories.extend(pageX.getCategoriesFrom())
-    
+    #If the pages don't have duplicate categories
+    if len(categories) == 0: categories.extend(pageY.getCategoriesFrom())
     queue.extend(pageX.getLinksFrom())
-    #flagged.append(pageX)
     lastLinksFrom = pageX
-    #Use BFS to find the closest path between two pages
+    # ==== Use BFS to find the closest path between two pages ====
     for subPage in queue:
         if subPage.name in [link.name for link in flagged] or subPage.name in [link.name for link in pages]: continue
         subPageLinks = subPage.getLinksFrom()
@@ -108,33 +98,31 @@ while len(pages) != 1:
         queue.remove(subPage)
         queue.extend(subPageLinks)
 
-    #Now that we've found the connection, let's clear the queue and try reccomend something
-    print("\tLooking for reccomendation")
-    print(categories)
+    # ==== Suggest recommendation ====
+    print("\tLooking for recommendation")
+    print("Intrested {} in categories: {}".format(len(categories), categories))
+    print("=== Looking for page with more than {} the same categories ===".format(int(2*math.log(len(categories)))))
     queue = connection.getLinksFrom()
     random.shuffle(queue)
-    flagged = []
+    flagged.clear()
     flagged.append(pageX)
     flagged.append(pageY)
+    #Store a page with the highest amout of relatable categories
     recommendation = [connection, []]
     for subPage in queue:
-        if subPage.name in [link.name for link in flagged] or subPage.name in [link.name for link in pages]: continue
-        sameCats = [item for item, count in collections.Counter(categories+subPage.getCategoriesFrom()).items() if count > 1]
-        # encounters.append([subPage.name, len(sameCats)])
-        if len(sameCats) > len(recommendation[1]):
-            recommendation = [subPage, sameCats]
-        if len(recommendation[1]) == len(categories):
-            break
-        print("Subpage: {}\t\t{} categories".format(subPage.name, len(sameCats)))
+        #Skip the duplicates
+        if subPage.name in [link.name for link in flagged] or subPage.name in [link.name for link in initPages]: continue
+        sameCategories = [item for item, count in collections.Counter(categories+subPage.getCategoriesFrom()).items() if count > 1]
+        if len(sameCategories) > len(recommendation[1]): recommendation = [subPage, sameCategories]
+        if len(recommendation[1]) > int(2*math.log(len(categories))): break
+        print("Subpage: {} -> {} categories".format(subPage.name, len(sameCategories)))
         flagged.append(subPage)
         queue.remove(subPage)
     print("The best recommendation is {} with {}".format(recommendation[0].name, len(recommendation[1])))
-    alerts.append("The best recommendation is {} with {} of the same categories".format(recommendation[0].name, len(recommendation[1])))
-    
+    alerts.append("\tThe best recommendation is {} with {} of the same categories".format(recommendation[0].name, len(recommendation[1])))
     pages.remove(pageX)
     pages.remove(pageY)
     pages.append(recommendation[0])
-    
     
 print("=" * 20)
 print("===== RESULTS =====")
