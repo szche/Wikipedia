@@ -18,7 +18,7 @@ class Page:
     def getLinksFrom(self):
         links = []
         response = requests.get(url+"action=parse&prop=links&format=json&page={}".format(self.name))
-        #If the page is invalid, return "-1" indicating error
+        #If the page is invalid, return an empty array indicating error
         try: data = response.json()["parse"]["links"]
         except: return links
         #Loop the gathered items and throw away all the Helpers etc.
@@ -58,7 +58,6 @@ while True:
 if len(pages) < 2:
     print("Not enough items to determine connections :(")
     exit()
-
 if len(pages)%2 == 1: pages.append(pages[0])
 
 initPages = copy.deepcopy(pages)
@@ -72,14 +71,10 @@ while len(pages) != 1:
     pageY = pages[1]
     print("\tLooking for the path between {} -> {}".format(pageX.name, pageY.name))
     connection = None
-    recommendation = None
+    
     queue = []
     flagged = []
-    categories = []
-    #Collect categories to find a recommendation later
-    categories = [item for item, count in collections.Counter(pageY.getCategoriesFrom() + pageX.getCategoriesFrom()).items() if count > 1]
-    #If the pages don't have duplicate categories
-    if len(categories) == 0: categories.extend(pageY.getCategoriesFrom())
+    
     queue.extend(pageX.getLinksFrom())
     lastLinksFrom = pageX
     # ==== Use BFS to find the closest path between two pages ====
@@ -104,6 +99,10 @@ while len(pages) != 1:
     print("=== Looking for page with more than {} the same categories ===".format(int(2*math.log(len(categories)))))
     queue = connection.getLinksFrom()
     random.shuffle(queue)
+    recommendation = None
+    #Collect categories to find a recommendation later
+    categories = [item for item, count in collections.Counter(pageY.getCategoriesFrom() + pageX.getCategoriesFrom()).items() if count > 1]
+    if len(categories) == 0: categories.extend(pageY.getCategoriesFrom())
     flagged.clear()
     flagged.append(pageX)
     flagged.append(pageY)
