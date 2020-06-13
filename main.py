@@ -94,9 +94,6 @@ while len(pages) != 1:
         queue.extend(subPageLinks)
 
     # ==== Suggest recommendation ====
-    print("\tLooking for recommendation")
-    print("Intrested {} in categories: {}".format(len(categories), categories))
-    print("=== Looking for page with more than {} the same categories ===".format(int(2*math.log(len(categories)))))
     queue = connection.getLinksFrom()
     random.shuffle(queue)
     recommendation = None
@@ -106,6 +103,9 @@ while len(pages) != 1:
     flagged.clear()
     flagged.append(pageX)
     flagged.append(pageY)
+    print("\tLooking for recommendation")
+    print("Intrested {} in categories: {}".format(len(categories), categories))
+    print("=== Looking for page with more than {} the same categories ===".format(int(2*math.log(len(categories)))))
     #Store a page with the highest amout of relatable categories
     recommendation = [connection, []]
     for subPage in queue:
