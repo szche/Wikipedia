@@ -8,6 +8,7 @@ import math
 url = "https://pl.wikipedia.org/w/api.php?"
 pages = []
 alerts = []
+apiCalls = 0
 
 class Page:
     path = []
@@ -16,8 +17,10 @@ class Page:
         self.path = path
     #Get all links within this page, return a Page list
     def getLinksFrom(self):
+        global apiCalls
         links = []
         response = requests.get(url+"action=parse&prop=links&format=json&page={}".format(self.name))
+        apiCalls += 1
         #If the page is invalid, return an empty array indicating error
         try: data = response.json()["parse"]["links"]
         except: return links
@@ -29,8 +32,10 @@ class Page:
         return links
     #Get all categories within this page
     def getCategoriesFrom(self):
+        global apiCalls
         categories = []
         response = requests.get(url+"action=parse&prop=categories&format=json&page={}".format(self.name))
+        apiCalls += 1
         try: data = response.json()["parse"]["categories"][::-1]
         except: return categories
         for item in data:
@@ -127,4 +132,5 @@ print("=" * 20)
 print("===== RESULTS =====")
 for alert in alerts:
     print(alert)
+print("Made {} API calls in total".format(apiCalls))
 print("=" * 20)
